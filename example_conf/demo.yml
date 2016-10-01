@@ -1,0 +1,11 @@
+# Example configuration for very basic demo
+
+# This configuration maps simple event tags to actions
+#
+
+# If we receive a high load alert, do the following things:
+#
+# 1) TODO: Alert us in Slack
+# 2) TODO: Have our config management layer request the load balancer to lower the traffic of the machine
+
+
