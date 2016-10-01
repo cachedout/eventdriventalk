@@ -14,29 +14,29 @@ class Reactor(object):
 
     def __init__(self, opts=None):
         if opts is None:
-            self.opts = self.process_config()
+            self.opts = self.process_config(CONFIG_LOCATION)
         else:
             self.opts = opts
 
         self.ctx = zmq.Context()
-        self.socket = ctx.socket(zmq.PULL)
+        self.socket = self.ctx.socket(zmq.PULL)
 
         self.socket.bind('tcp://127.0.0.1:12345')
 
         self.loop = zmq.eventloop.IOLoop.instance()
-        self.stream = zmq.eventloop.zmqstream.ZMQStream(socket, loop)
+        self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
 
         self.stream.on_recv(self.stream_decode)
 
     def start(self):
         print('Starting loop')
         try:
-            loop.start()
+            self.loop.start()
         except KeyboardInterrupt:
             print('\nShutting down')
 
 
-    def process_config(config_location):
+    def process_config(self, config_location):
         if not os.path.exists(config_location):
             print('WARNING: No config file was found at {0}'.format(config_location))
             return {}
@@ -48,7 +48,7 @@ class Reactor(object):
                 fh_.close()
             return config
 
-    def process_event(event):
+    def process_event(self, event):
         '''
         Take an event and attempt to match it
         in the list of keys.
@@ -58,11 +58,11 @@ class Reactor(object):
         pass
             
 
-    def stream_decode(raw):
+    def stream_decode(self, raw):
         print('Fetched {0} messages'.format(len(raw)))
         for msg in raw:
             event = framer.unpack(msg)
             print(event)
-            process_event(event)
+            self.process_event(event)
 
 
