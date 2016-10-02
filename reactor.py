@@ -142,7 +142,11 @@ class Reactor(object):
                     t.start()
                     
     def react(self, action, event):
-        self.reactions[action](event)
+        if isinstance(action, str):
+            self.reactions[action](event)
+        elif isinstance(action, dict):
+            for act in action:
+                self.reactions[act](event, action[act])
 
     def stream_decode(self, raw):
         for msg in raw:
