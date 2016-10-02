@@ -2,16 +2,51 @@
 
 import os
 import yaml
+import framer
+import loader
+import fnmatch
+import threading
 import zmq
 import zmq.eventloop
 import zmq.eventloop.zmqstream
-import framer
 
 
 CONFIG_LOCATION='/home/mp/devel/eventdriventalk/example_conf/demo.yml'
 
-class Reactor(object):
 
+class Publisher(object):
+    '''
+    A PUB/SUB relationahip that can publish events based on rules
+    '''
+    def __init__(self, opts=None):
+        if opts is None:
+            self.opts = self.process_config(CONFIG_LOCATION)
+        else:
+            self.opts = opts
+
+        self.ctx = zmq.Context()
+        self.socket = self.ctx.socket(zmq.PUB)
+
+        self.socket.bind('tcp://127.0.0.1:2000')
+
+        self.loop = zmq.eventloop.IOLoop.instance()
+        self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
+
+    def start(self):
+        print('Starting publisher!')
+        try:
+            self.loop.start()
+        except KeyboardInterrupt:
+            self.stream.close()
+            self.loop.stop()
+            print('Shutting down!')
+
+
+class Reactor(object):
+    '''
+    A PUSH/PULL relationship that takes events streamed from one or more
+    machines and reacts to them using a trivial rules engine.
+    '''
     def __init__(self, opts=None):
         if opts is None:
             self.opts = self.process_config(CONFIG_LOCATION)
@@ -21,20 +56,23 @@ class Reactor(object):
         self.ctx = zmq.Context()
         self.socket = self.ctx.socket(zmq.PULL)
 
-        self.socket.bind('tcp://127.0.0.1:12345')
+        self.socket.bind('tcp://127.0.0.1:2001')
 
         self.loop = zmq.eventloop.IOLoop.instance()
         self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
 
         self.stream.on_recv(self.stream_decode)
 
+        self.reactions = loader.load_reactions(self.opts, '/home/mp/devel/eventdriventalk/reactions')
+
     def start(self):
-        print('Starting loop')
+        print('Starting reactor!')
         try:
             self.loop.start()
         except KeyboardInterrupt:
+            self.stream.close()
+            self.loop.stop()
             print('\nShutting down')
-
 
     def process_config(self, config_location):
         if not os.path.exists(config_location):
@@ -55,14 +93,25 @@ class Reactor(object):
 
         If found, schedule the requested action.
         '''
-        pass
-            
+        if not self.opts:
+            return
+        for reaction in self.opts:
+            if fnmatch.fnmatch(event['tag'], reaction):
+                for action in self.opts[reaction]:
+                    # Super-simple non-blocking appraoch
+                    # Threading won't scale as much as a true event loop
+                    # would. It will, however, handle cases where single-threaded
+                    # loop would be blocked. Do you trust your reactions to be co-op?!
+                    t = threading.Thread(target=self.react, args=(action, event))
+                    t.start()
+                    
+    def react(self, action, event):
+        self.reactions[action](event)
 
     def stream_decode(self, raw):
-        print('Fetched {0} messages'.format(len(raw)))
         for msg in raw:
             event = framer.unpack(msg)
-            print(event)
+            print('Decoded', event)
             self.process_event(event)
 
 

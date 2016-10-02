@@ -9,7 +9,7 @@ import framer
 ctx = zmq.Context()
 
 # Our tag
-tag = '/client_load/silver'
+tag = '/client/load/silver'
 while True:
     # Frame it up
     event = framer.pack(tag, {'cur_load': os.getloadavg()})
