@@ -66,6 +66,7 @@ class Publisher(object):
 
     def ping(self, *args, **kwargs):
         print('Ping called')
+        self.pub_socket.send_string('Pong!')
 
 
 class Reactor(object):

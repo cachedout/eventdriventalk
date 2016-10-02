@@ -10,4 +10,4 @@
 # 3) TODO: Have our config management layer request the load balancer to lower the traffic of the machine
 
 /client/load/*:
-    - printer.print_with_delay # Just print all the load msgs to stdout
+    - reactions.printer.print_with_delay # Just print all the load msgs to stdout
