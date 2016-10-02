@@ -9,6 +9,7 @@ import threading
 import zmq
 import zmq.eventloop
 import zmq.eventloop.zmqstream
+import tornado.ioloop
 
 
 CONFIG_LOCATION='/home/mp/devel/eventdriventalk/example_conf/demo.yml'
@@ -25,21 +26,46 @@ class Publisher(object):
             self.opts = opts
 
         self.ctx = zmq.Context()
-        self.socket = self.ctx.socket(zmq.PUB)
+        self.pub_socket = self.ctx.socket(zmq.PUB)
 
-        self.socket.bind('tcp://127.0.0.1:2000')
+        self.pub_socket.bind('tcp://127.0.0.1:2000')
 
         self.loop = zmq.eventloop.IOLoop.instance()
-        self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
+        self.pub_stream = zmq.eventloop.zmqstream.ZMQStream(self.pub_socket, self.loop)
+
+        # Now create PULL socket over IPC to listen to reactor
+
+        self.pull_socket = self.ctx.socket(zmq.PULL)
+        self.pull_socket.bind('ipc:///tmp/reactor.ipc')
+        self.pull_stream = zmq.eventloop.zmqstream.ZMQStream(self.pull_socket, self.loop)
+
+        # Test bridge
+        self.pull_stream.on_recv(self.ping)
+
+
+    def process_config(self, config_location):
+        if not os.path.exists(config_location):
+            print('WARNING: No config file was found at {0}'.format(config_location))
+            return {}
+        else:
+            try:
+                fh_ = open(config_location)
+                config = yaml.load(fh_)
+            finally:
+                fh_.close()
+            return config
 
     def start(self):
         print('Starting publisher!')
         try:
             self.loop.start()
         except KeyboardInterrupt:
+            print('Shutting down!')
             self.stream.close()
             self.loop.stop()
-            print('Shutting down!')
+
+    def ping(self, *args, **kwargs):
+        print('Ping called')
 
 
 class Reactor(object):
@@ -53,15 +79,22 @@ class Reactor(object):
         else:
             self.opts = opts
 
+        # General setup of ZeroMQ
         self.ctx = zmq.Context()
-        self.socket = self.ctx.socket(zmq.PULL)
-
-        self.socket.bind('tcp://127.0.0.1:2001')
-
         self.loop = zmq.eventloop.IOLoop.instance()
-        self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
 
-        self.stream.on_recv(self.stream_decode)
+        # Begin setup of PULL socket
+        self.pull_socket = self.ctx.socket(zmq.PULL)
+        self.pull_socket.bind('tcp://127.0.0.1:2001')
+
+        self.pull_stream = zmq.eventloop.zmqstream.ZMQStream(self.pull_socket, self.loop)
+        self.pull_stream.on_recv(self.stream_decode)
+
+        # Begin setup of PUSH socket for IPC to publisher
+        self.push_socket = self.ctx.socket(zmq.PUSH)
+        self.push_socket.connect('ipc:///tmp/reactor.ipc')
+
+        self.push_stream = zmq.eventloop.zmqstream.ZMQStream(self.push_socket, self.loop)
 
         self.reactions = loader.load_reactions(self.opts, '/home/mp/devel/eventdriventalk/reactions')
 
@@ -95,6 +128,8 @@ class Reactor(object):
         '''
         if not self.opts:
             return
+        ## TESTING
+        self.push_socket.send_string('Saw something!')
         for reaction in self.opts:
             if fnmatch.fnmatch(event['tag'], reaction):
                 for action in self.opts[reaction]:
