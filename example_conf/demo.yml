@@ -12,8 +12,10 @@
 /client/load/*:
     - reactions.printer.print_with_delay
     - rules.aggregate.max:
-        - max: 20
-        - reactions:
-            - reactions.event.fire_event:
-                - tag: 'Load exceeded'
-                - data: {}
+        rule:
+         max: 20
+         reactions:
+             reactions.event.fire_event:
+                 tag: '/reconfig/lb'
+                 data:
+                     some_reconfig_data: 'dummy_data'
