@@ -36,8 +36,9 @@ systems.
 
 As the events arrive at management nodes, they are routed through a decision engine. The decision engine
 checks to see if the event is one which should be acted upon. If so, it proceeds to run the event through
-a series of rules to determine if an action should be taken. In a more full-featured decision engine
-these rules could (and should) be chained, although this example does not support chained rules.
+a series of rules to determine if an action should be taken. If a rule matches, actions are taken
+and the next rule is evaluated. More complex rules engines are obviously possible and desireable. One
+good place to explore might be [Pyke](http://pyke.sourceforge.net/knowledge_bases/rule_bases.html).
 
 As an event flows through the decision engine, various rules may check a series of registers. These
 registers maintain an ongoing state by allowing events to modify a shared K/V store. These registers
