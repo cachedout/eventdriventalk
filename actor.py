@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 
-import client
+import core.client
 
-client = client.Actor()
+client = core.client.Actor()
 
 client.start()

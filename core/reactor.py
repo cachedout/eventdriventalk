@@ -12,7 +12,7 @@ import zmq.eventloop.zmqstream
 import tornado.ioloop
 
 
-CONFIG_LOCATION='/home/mp/devel/eventdriventalk/example_conf/demo.yml'
+CONFIG_LOCATION='/home/mp/devel/eventdriventalk/conf/demo.yml'
 
 
 class Publisher(object):
