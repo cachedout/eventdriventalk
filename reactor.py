@@ -39,8 +39,7 @@ class Publisher(object):
         self.pull_socket.bind('ipc:///tmp/reactor.ipc')
         self.pull_stream = zmq.eventloop.zmqstream.ZMQStream(self.pull_socket, self.loop)
 
-        # Test bridge
-        self.pull_stream.on_recv(self.ping)
+        self.pull_stream.on_recv(self.republish)
 
 
     def process_config(self, config_location):
@@ -64,10 +63,8 @@ class Publisher(object):
             self.stream.close()
             self.loop.stop()
 
-    def ping(self, *args, **kwargs):
-        print('Ping called')
-        self.pub_socket.send_string('Pong!')
-
+    def republish(self, msg):
+        self.pub_socket.send_string(msg)
 
 class Reactor(object):
     '''
@@ -131,22 +128,35 @@ class Reactor(object):
             return
         ## TESTING
         self.push_socket.send_string('Saw something!')
-        for reaction in self.opts:
-            if fnmatch.fnmatch(event['tag'], reaction):
-                for action in self.opts[reaction]:
+        for tag in self.opts:
+            if fnmatch.fnmatch(event['tag'], tag):
+                for action in self.opts[tag]['reactions']:
                     # Super-simple non-blocking appraoch
                     # Threading won't scale as much as a true event loop
                     # would. It will, however, handle cases where single-threaded
                     # loop would be blocked. Do you trust your reactions to be co-op?!
+                    # Of course, the other side of this is thread-safety. Either way, be smart!
                     t = threading.Thread(target=self.react, args=(action, event))
                     t.start()
+                for rule in self.opts[tag]['rules']:
+                    self.process_rule(rule)
+
+    def process_rule(self, rule, event):
+        rule_name = rule.keys()[0]  # FIXME: This could be improved.
+        register = rule[rule_name]['register']
+        # Bail out if the period has expired in the register.
+        if register.period < rule[rule_name]['period']:
+            return
+        else:
+            registered_val = self.register[register](event)  # FIXME normalize?
+            # Now process the rule
+            if self.rules[rule_name](registered_val, rule[rule_name][threshold]):
+                # If the rule rule matches, start processing reactions
+                for react in rule[rule_name][reactions]:
+                    self.react(react, rule[rule_name][reaction].values())
                     
     def react(self, action, event):
-        if isinstance(action, str):
-            self.reactions[action](event)
-        elif isinstance(action, dict):
-            for act in action:
-                self.reactions[act](event, action[act])
+         self.reactions[action](event)
 
     def stream_decode(self, raw):
         for msg in raw:
