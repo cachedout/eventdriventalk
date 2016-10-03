@@ -8,7 +8,7 @@ and then calculates an average
 # Import Python libs
 import Queue
 
-class Aggregator(object):
+class NumAggregator(object):
     def __init__(self, queue_len):
         self.queue = Queue.Queue(maxsize=queue_len)
         self.max_counter = 0

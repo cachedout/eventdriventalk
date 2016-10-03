@@ -76,7 +76,7 @@ class Reactor(object):
             self.opts = self.process_config(CONFIG_LOCATION)
         else:
             self.opts = opts
-
+        return
         # General setup of ZeroMQ
         self.ctx = zmq.Context()
         self.loop = zmq.eventloop.IOLoop.instance()
@@ -128,8 +128,6 @@ class Reactor(object):
         '''
         if not self.opts:
             return
-        ## TESTING
-        self.push_socket.send_string('Saw something!')
         for tag in self.opts:
             if fnmatch.fnmatch(event['tag'], tag):
                 for action in self.opts[tag]['reactions']:
@@ -140,22 +138,36 @@ class Reactor(object):
                     # Of course, the other side of this is thread-safety. Either way, be smart!
                     t = threading.Thread(target=self.react, args=(action, event))
                     t.start()
+                if 'rules' in self.opts[tag]:
+                    rule_actions = []
                 for rule in self.opts[tag]['rules']:
-                    self.process_rule(rule)
+                    rule_actions = process_rule(rule, event, tracking_id)
+                    if rule_actions:
+                        for action in rule_actions:
+                            self.react(action.keys()[0], action.values())
+                    else:
+                        # Rule chaining ends when a rule does not match
+                        break
 
-    def process_rule(self, rule, event):
-        rule_name = rule.keys()[0]  # FIXME: This could be improved.
-        register = rule[rule_name]['register']
-        # Bail out if the period has expired in the register.
-        if register.period < rule[rule_name]['period']:
-            return
-        else:
-            registered_val = self.registers[register](event)  # FIXME normalize?
-            # Now process the rule
-            if self.rules[rule_name](registered_val, rule[rule_name][threshold]):
-                # If the rule rule matches, start processing reactions
-                for react in rule[rule_name][reactions]:
-                    self.react(react, rule[rule_name][reaction].values())
+
+    def process_rule(self, rule, event, tracking_id):
+        reactions = []
+        for rule_name in rule:
+            #register = rule[rule_name]['register']
+            # Bail out if the period has expired in the register.
+            rule_register = rule[rule_name]['register']
+            if self.registers[rule_register].period < rule[rule_name]['period']:
+                return
+            else:
+                registered_val = self.registers[rule_register](event['data'])  # FIXME normalize :]
+                # Now process the rule
+                if self.rules[rule_name](registered_val, rule[rule_name][threshold]):
+
+                    # If the rule rule matches, start processing reactions
+                    for react in rule[rule_name]['reactions']:
+                        reactions.append(react)
+                    return reactions
+
                     
     def react(self, action, event):
          self.actions[action](event)
