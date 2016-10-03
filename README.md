@@ -13,6 +13,9 @@ This is a small example which illustrates the componenents most often found in e
 This code is in no way intended to be run in production or anywhere at all, really. At any given point,
 it might be completely broken or might set your hair on fire. ;]
 
+At a bare minimum the core components will not handle more than one incoming event at a time. Obviously,
+this is a severe limitiation!
+
 It is, however, intended to be used as a springboard for understanding the concepts behind event-driven automation
 and as a conceptual model from which you can build your own systems.
 
@@ -161,4 +164,53 @@ In the event that it is necessary to collect aggregate events, or to have a loca
 which other events can read from, a register is provided.
 
 
+An example single rule for a matched tag might look as follows:
 
+```
+/client/load/*:
+    rules:
+        - load_avg:
+            rule: rules.simple.gt
+            register: register.aggregate.avg
+            threshold: 20
+            period: 10
+            reactions:
+		# Have the LB turn down the traffic
+                - reactions.eventer.fire_event:
+                    tag: '/reconfig/lb'
+                    data:
+                        turn_down_the_hose: originating_host
+		- reactions.cloud.scale_up:
+		    machine_id: originating_host
+
+```
+(In development)
+Rules can also be chained using logical operators.
+
+```
+/client/load/*:
+    rules:
+        - load_avg:
+            rule: rules.simple.gt
+            register: register.aggregate.avg
+            threshold: 20
+            period: 10
+            reactions:
+                - reactions.eventer.fire_event:
+                    tag: '/reconfig/lb'
+                    data:
+                        some_reconfig_data: 'dummy_data'
+            chain:
+                 - OR: io_avg
+
+        - io_avg:
+            rule: rules.simple.gt
+            register: register.aggregate.avg
+            threshold: 20
+            period: 10
+            reactions:
+                - reactions.eventer.fire_event:
+                    tag: '/reconfig/lb'
+                    data:
+                        some_reconfig_data: 'dummy_data'
+```
