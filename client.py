@@ -1,9 +1,12 @@
 # -*- encoding: utf-8 -*-
 import os
 import zmq
+import yaml
+import core.framer
+import core.loader
 import zmq.eventloop
 import zmq.eventloop.zmqstream
-import yaml
+import multiprocessing
 
 '''
 Create a basic Actor that can take requests
@@ -16,9 +19,9 @@ CONFIG_LOCATION = '/home/mp/devel/eventdrivetalk/example_conf/demo_actor.yml'
 class Actor(object):
     def __init__(self, opts=None):
         if opts is None:
-            self.__opts = self.process_config(CONFIG_LOCATION)
+            self.opts = self.process_config(CONFIG_LOCATION)
         else:
-            self.__opts = opts
+            self.opts = opts
 
         # Start setting up ZeroMQ
         self.ctx = zmq.Context()
@@ -28,6 +31,10 @@ class Actor(object):
 
         self.loop = zmq.eventloop.IOLoop.instance()
         self.stream = zmq.eventloop.zmqstream.ZMQStream(self.socket, self.loop)
+        self.stream.on_recv(act)
+
+        # Load up actions
+        self.actions = loader.load_actions(self.opts, '/home/mp/devel/eventdrivetalk/actions')
 
     def start(self):
         print('Starting Actor')
@@ -50,3 +57,19 @@ class Actor(object):
                 fh_close()
             return config
 
+    def act(self, msg):
+        '''
+        Take a received event and act on it
+        '''
+        event = framer.unpack(msg)
+        action = event['tag'].split().pop()
+
+        # Obviously, we'd normally do some sort of host checking
+        # and auth so this is ridiculous but this is just for fun!
+        #
+        # Blind trust ahoy! ;]
+        mp = multiprocessing.Process(target=self._act_target, args=(action))
+
+    def _act_target(self,  action):
+        # Perform the action!
+        self.actions[action]()

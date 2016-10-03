@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 
-import reactor
+import core.reactor
 
 reactor = reactor.Publisher()
 
