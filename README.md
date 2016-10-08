@@ -3,6 +3,8 @@ Code samples from a talk on event-driven infrastructure, first presented at DevO
 
 *DO NOT EVER USE THIS IN PRODUCTION. YOU HAVE BEEN WARNED.*
 
+*THIS IS PSEUDO-CODE AND NOT A LIBRARY!!!! IT WILL NOT RUN!!!*
+
 Slides from the talk itself are located in `/powerpoint`.
 
 Overview and Warning
